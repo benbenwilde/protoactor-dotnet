@@ -1,0 +1,6 @@
+image:
+  tag: latest
+  digest: ''
+  pullPolicy: Never
+  
+dirNum: 0

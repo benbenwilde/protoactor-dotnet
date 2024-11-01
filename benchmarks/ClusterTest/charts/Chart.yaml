@@ -1,0 +1,4 @@
+apiVersion: v1
+description: Cluster Test
+name: cluster-test
+version: 1.0.0

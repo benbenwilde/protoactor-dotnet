@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-echo
+  namespace: {{ .Release.Namespace }}
+  labels:
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+      annotations:
+        rollout-restart: {{ randAlphaNum 5 | quote }}
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+      - name: {{ .Chart.Name }}-echo
+        {{- with .Values.image }}
+        image: "{{- if .repository -}}{{ .repository }}{{ else }}{{ .registry }}/{{ .image }}{{- end -}}:{{ default .tag "latest" }}{{- if (.digest) -}} @{{.digest}} {{- end -}}"
+        {{- end }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: PROTO_KIND
+          value: "echo"
+        - name: PROTO_CLIENT
+          value: "false"
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_SERVICENAME
+          value: "{{ .Chart.Name }}"
+        - name: POD_NAMESPACE
+          value: "{{ .Release.Namespace }}"
+        ports:
+        - containerPort: 4020
+          protocol: TCP
+        volumeMounts:
+          - name: members-volume
+            mountPath: /app/members
+            readOnly: false
+{{/*          - name: cert*/}}
+{{/*            mountPath: /app/certs*/}}
+{{/*            readOnly: true*/}}
+{{/*          - name: ca-cert*/}}
+{{/*            mountPath: /etc/ssl/certs/ca.crt*/}}
+{{/*            subPath: ca.crt*/}}
+{{/*            readOnly: true*/}}
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 250m
+            memory: 250Mi
+      volumes:
+        - name: members-volume
+          hostPath:
+            path: /tmp/{{ .Values.dirNum }}
+{{/*        - name: cert*/}}
+{{/*          secret:*/}}
+{{/*            secretName: {{ template "name" . }}-cert*/}}
+{{/*        - name: ca-cert*/}}
+{{/*          configMap:*/}}
+{{/*            name: tethr-ca-bundle*/}}

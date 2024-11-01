@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -174,6 +175,7 @@ public sealed class EndpointManager : IDiagnosticsProvider
             return endpoint;
         }
 
+        var sw = Stopwatch.StartNew();
         lock (_synLock)
         {
             if (_cancellationTokenSource.IsCancellationRequested || _blockedAddresses.ContainsKey(address))
@@ -234,6 +236,7 @@ public sealed class EndpointManager : IDiagnosticsProvider
             return endpoint;
         }
 
+        var sw = Stopwatch.StartNew();
         lock (_synLock)
         {
             if (_cancellationTokenSource.IsCancellationRequested || _blockedClientSystemIds.ContainsKey(systemId))

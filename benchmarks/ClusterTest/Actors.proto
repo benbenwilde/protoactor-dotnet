@@ -1,0 +1,8 @@
+syntax = "proto3";
+import "messages.proto";
+
+option csharp_namespace = "ClusterTest";
+
+service EchoGrain {
+	rpc SendPing (Ping) returns (Pong) {}
+}
