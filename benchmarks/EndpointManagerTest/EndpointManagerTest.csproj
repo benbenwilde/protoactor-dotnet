@@ -13,10 +13,4 @@
 		<ProjectReference Include="..\..\src\Proto.Remote\Proto.Remote.csproj" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <Content Include="..\..\.dockerignore">
-	    <Link>.dockerignore</Link>
-	  </Content>
-	</ItemGroup>
-	
 </Project>
