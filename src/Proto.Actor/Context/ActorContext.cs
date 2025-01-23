@@ -621,7 +621,7 @@ public class ActorContext : IMessageInvoker, IContext, ISupervisor
         // Don't execute the continuation if the actor instance changed.
         // Without this, Continuation's Action closure would execute with
         // an older Actor instance.
-        if (cont.Actor != Actor && cont is not { Actor: null })
+        if (_state == ContextState.Stopped || System.Shutdown.IsCancellationRequested || (cont.Actor != Actor && cont is not { Actor: null }))
         {
                 Logger.DroppingContinuation(Self, MessageEnvelope.UnwrapMessage(cont.Message));
 
