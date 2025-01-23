@@ -301,6 +301,49 @@ public class ReenterTests : ActorTestBase
         var res = await Context.RequestAsync<bool>(pid, "waitstate", TimeSpan.FromSeconds(5));
         Assert.True(res);
     }
+    
+    [Fact]
+    public async Task DropReenterContinuationAfterStop()
+    {
+        var stopped = false;
+        var completionExecuted = false;
+        CancellationTokenSource cts = new();
+
+        var props = Props.FromFunc(async ctx =>
+            {
+                switch (ctx.Message)
+                {
+                    case "start":
+
+                        ctx.ReenterAfter(
+                            Task.Delay(-1, cts.Token),
+                            () => { completionExecuted = true; });
+                        
+                        ctx.Stop(ctx.Self);
+                        
+                        // Release the cancellation token after stop gets processed.
+                        cts.Cancel();
+
+                        ctx.Respond(true);
+
+                        break;
+                    case Stopped:
+                        stopped = true;
+                        
+                        break;
+                }
+            }
+        );
+
+        var pid = Context.Spawn(props);
+
+        await Context.RequestAsync<bool>(pid, "start", TimeSpan.FromSeconds(5));
+        
+        await Task.Delay(500);
+        await Task.Yield();
+        
+        Assert.True(!completionExecuted);
+    }
 
     private class ReenterAfterCancellationActor : IActor
     {
