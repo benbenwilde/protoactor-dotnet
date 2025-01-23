@@ -596,7 +596,7 @@ public class ActorContext : IMessageInvoker, IContext, ISupervisor
                 // ignored
             }
 
-            if (!ctx.System.Shutdown.IsCancellationRequested)
+            if (!ctx.CancellationToken.IsCancellationRequested && !ctx.System.Shutdown.IsCancellationRequested)
             {
                 ctx.Self.SendSystemMessage(ctx.System, cont);
             }
