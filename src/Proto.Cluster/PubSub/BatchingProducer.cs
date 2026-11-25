@@ -72,46 +72,40 @@ public class BatchingProducer : IAsyncDisposable
             {
                 IdleTimeout = _config.PublisherIdleTimeout
             }, _topic, cancel).ConfigureAwait(false);
-            try
+
+            while (!cancel.IsCancellationRequested)
             {
-                while (!cancel.IsCancellationRequested)
+                if (_publisherChannel.Reader.TryRead(out var produceMessage))
                 {
-                    if (_publisherChannel.Reader.TryRead(out var produceMessage))
+                    if (!produceMessage.Cancel.IsCancellationRequested)
                     {
-                        if (!produceMessage.Cancel.IsCancellationRequested)
-                        {
-                            batchWrapper.Batch.Envelopes.Add(produceMessage.Message);
-                            batchWrapper.DeliveryReports.Add(produceMessage.TaskCompletionSource);
-                            batchWrapper.CancelTokens.Add(produceMessage.Cancel);
-                        }
-                        else
-                        {
-                            _ = produceMessage.TaskCompletionSource.TrySetCanceled(CancellationToken.None);
-                        }
-
-                        if (batchWrapper.Batch.Envelopes.Count < _config.BatchSize)
-                        {
-                            continue;
-                        }
-
-                        await PublishBatch(batchWrapper).ConfigureAwait(false);
-                        batchWrapper = new PubSubBatchWithReceipts();
+                        batchWrapper.Batch.Envelopes.Add(produceMessage.Message);
+                        batchWrapper.DeliveryReports.Add(produceMessage.TaskCompletionSource);
+                        batchWrapper.CancelTokens.Add(produceMessage.Cancel);
                     }
                     else
                     {
-                        if (batchWrapper.Batch.Envelopes.Count > 0)
-                        {
-                            await PublishBatch(batchWrapper).ConfigureAwait(false);
-                            batchWrapper = new PubSubBatchWithReceipts();
-                        }
-
-                        await _publisherChannel.Reader.WaitToReadAsync(cancel).ConfigureAwait(false);
+                        _ = produceMessage.TaskCompletionSource.TrySetCanceled(CancellationToken.None);
                     }
+
+                    if (batchWrapper.Batch.Envelopes.Count < _config.BatchSize)
+                    {
+                        continue;
+                    }
+
+                    await PublishBatch(batchWrapper).ConfigureAwait(false);
+                    batchWrapper = new PubSubBatchWithReceipts();
                 }
-            }
-            finally
-            {
-                StopAcceptingNewMessages();
+                else
+                {
+                    if (batchWrapper.Batch.Envelopes.Count > 0)
+                    {
+                        await PublishBatch(batchWrapper).ConfigureAwait(false);
+                        batchWrapper = new PubSubBatchWithReceipts();
+                    }
+
+                    await _publisherChannel.Reader.WaitToReadAsync(cancel).ConfigureAwait(false);
+                }
             }
         }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested)
@@ -127,10 +121,13 @@ public class BatchingProducer : IAsyncDisposable
                 Logger.LogError(e, "Error in the publisher loop of Producer for topic {Topic}", _topic);
             }
 
+            // the channel must be completed before draining it, or FailPendingMessages never ends
+            StopAcceptingNewMessages();
             FailBatch(batchWrapper, e);
             await FailPendingMessages(e).ConfigureAwait(false);
         }
 
+        StopAcceptingNewMessages();
         CancelBatch(batchWrapper);
         await CancelPendingMessages().ConfigureAwait(false);
 

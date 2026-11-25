@@ -100,6 +100,22 @@ public class PubSubBatchingProducerTests
     }
 
     [Fact]
+    public async Task Publishing_through_producer_that_failed_to_initialize_throws()
+    {
+        var producer = new BatchingProducer(new FailingInitializeMockPublisher(), "topic",
+            new BatchingProducerConfig { BatchSize = 10 });
+        await using var _ = producer;
+
+        // queued before initializing fails, so it gets the initialize exception
+        var sutAction = () => producer.ProduceAsync(new TestMessage(1));
+        await sutAction.Should().ThrowAsync<TestException>();
+
+        // the producer is stopped, instead of failing every new message with the initialize exception forever
+        sutAction = () => producer.ProduceAsync(new TestMessage(2));
+        await sutAction.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
     public async Task Throws_when_queue_full()
     {
         await using var producer =
@@ -341,6 +357,18 @@ public class PubSubBatchingProducerTests
 
         public Task<PublishResponse> PublishBatch(string topic, PubSubBatch batch, CancellationToken ct = default) =>
             _publish(batch);
+    }
+
+    private class FailingInitializeMockPublisher : IPublisher
+    {
+        public async Task Initialize(PublisherConfig? config, string topic, CancellationToken ct = default)
+        {
+            await Task.Delay(100, ct);
+            throw new TestException();
+        }
+
+        public Task<PublishResponse> PublishBatch(string topic, PubSubBatch batch, CancellationToken ct = default) =>
+            Task.FromResult(new PublishResponse());
     }
 
     private class OptionalFailureMockPublisher : IPublisher
